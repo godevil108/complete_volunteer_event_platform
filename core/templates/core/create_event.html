@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Event</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .map-container {
+            height: 300px;
+            width: 100%;
+            margin-top: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card {
+            border-radius: 10px;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border: none;
+            padding: 10px;
+            font-weight: 500;
+        }
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        .form-control, .form-select {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        .current-image-preview {
+            max-height: 150px;
+            margin-top: 10px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card p-4 p-md-5 shadow-sm">
+                    <h2 class="text-center mb-4 fw-bold">Create New Event</h2>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <!-- Event Name -->
+                            <div class="col-md-6 mb-3">
+                                <label for="id_name" class="form-label">Event Name</label>
+                                {{ form.name }}
+                                <small class="text-muted">Give your event a descriptive name</small>
+                            </div>
+                            
+                            <!-- Event Type -->
+                            <div class="col-md-6 mb-3">
+                                <label for="id_type" class="form-label">Event Type</label>
+                                {{ form.type }}
+                                <small class="text-muted">Select the category that best fits</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Address -->
+                        <div class="mb-3">
+                            <label for="id_address" class="form-label">Full Address</label>
+                            {{ form.address }}
+                            <small class="text-muted">Include street, city, and other details</small>
+                        </div>
+                        
+                        <div class="row">
+                            <!-- Pincode -->
+                            <div class="col-md-6 mb-3">
+                                <label for="id_pincode" class="form-label">Pincode</label>
+                                {{ form.pincode }}
+                                <small class="text-muted">6-digit postal code</small>
+                            </div>
+                            
+                            <!-- Date -->
+                            <div class="col-md-3 mb-3">
+                                <label for="id_date" class="form-label">Date</label>
+                                {{ form.date }}
+                            </div>
+                            
+                            <!-- Time -->
+                            <div class="col-md-3 mb-3">
+                                <label for="id_time" class="form-label">Time</label>
+                                {{ form.time }}
+                            </div>
+                        </div>
+                        
+                        <!-- Image Upload -->
+                        <div class="mb-4">
+                            <label for="id_image" class="form-label">Event Image</label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="id_image" name="image" accept="image/*">
+                            </div>
+                            <div id="imagePreview" class="mt-2 d-none">
+                                <small class="text-muted">Image preview:</small>
+                                <img id="previewImage" src="#" alt="Preview" class="img-thumbnail current-image-preview d-block">
+                            </div>
+                        </div>
+                        
+                        <!-- Google Map -->
+                        <div class="mb-2">
+                            <button type="button" class="btn btn-outline-primary" id="getCurrentLocation">
+                                <i class="fas fa-location-arrow me-2"></i>Use Current Location
+                            </button>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Event Location</label>
+                            <div id="map" class="map-container"></div>
+                            <small class="text-muted">Map will show the approximate location based on pincode</small>
+                            <input type="hidden" id="latitude" name="latitude">
+                            <input type="hidden" id="longitude" name="longitude">
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle me-2"></i> Create Event
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBBDioUYwNz5fMaYgWJCcPkAu6Q-qROcyg&libraries=places"></script>
+    <!-- Google Maps API -->
+
+<script>
+    let map, marker, autocomplete;
+    let pincodeTimeout;
+
+    function initMap() {
+        const defaultLocation = { lat: 20.5937, lng: 78.9629 }; // India center
+
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 8,
+            center: defaultLocation,
+        });
+
+        marker = new google.maps.Marker({
+            position: defaultLocation,
+            map: map,
+            draggable: true,
+        });
+
+        // Get current location when initializing
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    // Update map and marker
+                    map.setCenter(currentLocation);
+                    map.setZoom(15);
+                    marker.setPosition(currentLocation);
+                    
+                    // Update form fields
+                    document.getElementById("latitude").value = currentLocation.lat;
+                    document.getElementById("longitude").value = currentLocation.lng;
+                    
+                    // Reverse geocode to get address
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: currentLocation }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            const addressInput = document.getElementById("id_address");
+                            addressInput.value = results[0].formatted_address;
+                            
+                            // Extract and set pincode if available
+                            const pincodeComponent = results[0].address_components.find(
+                                component => component.types.includes('postal_code')
+                            );
+                            if (pincodeComponent) {
+                                document.getElementById("id_pincode").value = pincodeComponent.long_name;
+                            }
+                        }
+                    });
+                },
+                (error) => {
+                    console.log("Geolocation error:", error);
+                    // Fallback to default location if geolocation fails
+                    document.getElementById("latitude").value = defaultLocation.lat;
+                    document.getElementById("longitude").value = defaultLocation.lng;
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        // Update lat/lng on marker drag
+        marker.addListener("dragend", function () {
+            const position = marker.getPosition();
+            document.getElementById("latitude").value = position.lat();
+            document.getElementById("longitude").value = position.lng();
+        });
+
+        // ✅ Autocomplete address input
+        const addressInput = document.getElementById("id_address");
+        autocomplete = new google.maps.places.Autocomplete(addressInput);
+        autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (place.geometry) {
+                const location = place.geometry.location;
+                map.setCenter(location);
+                map.setZoom(15);
+                marker.setPosition(location);
+                document.getElementById("latitude").value = location.lat();
+                document.getElementById("longitude").value = location.lng();
+            }
+        });
+
+        // ✅ Debounced geocoding for pincode
+        const pincodeInput = document.getElementById("id_pincode");
+        pincodeInput.addEventListener("input", function () {
+            clearTimeout(pincodeTimeout);
+            const pincode = this.value;
+
+            pincodeTimeout = setTimeout(() => {
+                if (pincode.length === 6) {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ address: pincode }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            const location = results[0].geometry.location;
+                            map.setCenter(location);
+                            marker.setPosition(location);
+                            document.getElementById("latitude").value = location.lat();
+                            document.getElementById("longitude").value = location.lng();
+                        } else {
+                            alert("Could not find location for the entered pincode.");
+                        }
+                    });
+                }
+            }, 500);
+        });
+    }
+
+    function loadGoogleMaps() {
+        const script = document.createElement("script");
+        script.src = "https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&libraries=places&callback=initMap";
+        script.defer = true;
+        script.async = true;
+        document.head.appendChild(script);
+    }
+
+    window.onload = initMap;
+
+    // ✅ Image preview
+    document.getElementById("id_image").addEventListener("change", function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const preview = document.getElementById("previewImage");
+                preview.src = e.target.result;
+                document.getElementById("imagePreview").classList.remove("d-none");
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Add this after your existing JavaScript code
+
+    document.getElementById("getCurrentLocation").addEventListener("click", function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    map.setCenter(currentLocation);
+                    map.setZoom(15);
+                    marker.setPosition(currentLocation);
+                    
+                    document.getElementById("latitude").value = currentLocation.lat;
+                    document.getElementById("longitude").value = currentLocation.lng;
+                    
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: currentLocation }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            document.getElementById("id_address").value = results[0].formatted_address;
+                            
+                            const pincodeComponent = results[0].address_components.find(
+                                component => component.types.includes('postal_code')
+                            );
+                            if (pincodeComponent) {
+                                document.getElementById("id_pincode").value = pincodeComponent.long_name;
+                            }
+                        }
+                    });
+                },
+                (error) => {
+                    console.log("Geolocation error:", error);
+                    alert("Could not get your current location. Please make sure location services are enabled.");
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    });
+</script>
+
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></>
+</body>
+</html>

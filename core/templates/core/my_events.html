@@ -1,0 +1,155 @@
+<!-- filepath: c:\Users\ASUS\Downloads\complete_volunteer_event_platform\core\templates\core\my_events.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Events</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">My Events</h2>
+        <h4>Participated Events</h4>
+        <div class="row mb-4">
+            {% for event in participated_events %}
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="{{ event.image.url }}" alt="{{ event.name }}" class="card-img-top" style="height: 200px; object-fit: cover;">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ event.name }}</h5>
+                            <p class="card-text">
+                                <strong>Date:</strong> {{ event.date }}<br>
+                                <strong>Time:</strong> {{ event.time }}<br>
+                                <strong>Type:</strong> {{ event.type }}<br>
+                                <strong>Address:</strong> {{ event.address }}<br>
+                                <strong>Pincode:</strong> {{ event.pincode }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <h4 class="mt-5">Certificates</h4>
+        <div class="row mb-4">
+            {% for event in participated_events %}
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ event.name }}</h5>
+                            <p class="card-text">
+                                <strong>Type:</strong> {{ event.type }}<br>
+                                <strong>Date:</strong> {{ event.date }}<br>
+                                <strong>Hours:</strong> 4 <!-- You should add hours field to Event model -->
+                            </p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button class="btn btn-primary btn-sm" onclick="generateCertificate('{{ event.name }}', '{{ event.date }}', '{{ user.get_full_name }}', '{{ event.type }}')">
+                                    <i class="fas fa-download me-1"></i> Download Certificate
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="previewCertificate('{{ event.name }}')">
+                                    <i class="fas fa-eye me-1"></i> Preview
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <h4>Requested Events</h4>
+        <div class="row">
+            {% for event in requested_events %}
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm">
+                        <img src="{{ event.image.url }}" alt="{{ event.name }}" class="card-img-top" style="height: 200px; object-fit: cover;">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ event.name }}</h5>
+                            <p class="card-text">
+                                <strong>Date:</strong> {{ event.date }}<br>
+                                <strong>Time:</strong> {{ event.time }}<br>
+                                <strong>Type:</strong> {{ event.type }}<br>
+                                <strong>Address:</strong> {{ event.address }}<br>
+                                <strong>Pincode:</strong> {{ event.pincode }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <a href="{% url 'volunteer_dashboard' %}" class="btn btn-primary w-100 mt-4">Back to Dashboard</a>
+    </div>
+
+    <script>
+        // Import jsPDF
+        const { jsPDF } = window.jspdf;
+
+        function generateCertificate(eventName, date, volunteerName, eventType) {
+            try {
+                // Create PDF document
+                const doc = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // Set background color
+                doc.setFillColor(240, 240, 240);
+                doc.rect(0, 0, 297, 210, 'F');
+
+                // Add border
+                doc.setDrawColor(70, 115, 223);
+                doc.setLineWidth(1);
+                doc.rect(10, 10, 277, 190);
+
+                // Add header
+                doc.setFontSize(40);
+                doc.setTextColor(70, 115, 223);
+                doc.text('Certificate of Participation', 148.5, 40, { align: 'center' });
+
+                // Add content
+                doc.setFontSize(16);
+                doc.setTextColor(33, 33, 33);
+                doc.text('This is to certify that', 148.5, 70, { align: 'center' });
+
+                // Volunteer name
+                doc.setFontSize(24);
+                doc.setTextColor(70, 115, 223);
+                doc.text(volunteerName || 'Volunteer Name', 148.5, 90, { align: 'center' });
+
+                // Description
+                doc.setFontSize(16);
+                doc.setTextColor(33, 33, 33);
+                doc.text(`has actively participated in "${eventName}"`, 148.5, 110, { align: 'center' });
+                doc.text(`a ${eventType} volunteer event held on ${date}`, 148.5, 125, { align: 'center' });
+
+                // Add signature and date
+                doc.setFontSize(12);
+                doc.text('Event Manager', 60, 170);
+                doc.text('Date of Issue', 237, 170);
+                doc.line(30, 165, 90, 165);
+                doc.line(207, 165, 267, 165);
+
+                // Add current date
+                const currentDate = new Date().toLocaleDateString();
+                doc.text(currentDate, 237, 180);
+
+                // Save the PDF
+                doc.save(`${eventName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_certificate.pdf`);
+
+                console.log('Certificate generated successfully');
+            } catch (error) {
+                console.error('Error generating certificate:', error);
+                alert('Error generating certificate. Please try again.');
+            }
+        }
+
+        function previewCertificate(eventName) {
+            alert('Preview feature coming soon!');
+        }
+    </script>
+</body>
+</html>
